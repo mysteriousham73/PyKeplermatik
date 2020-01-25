@@ -1,0 +1,136 @@
+language: python
+sudo: false
+# safelist
+branches:
+  only:
+  - master
+  - stable
+
+matrix:
+  include:
+    - os: osx
+      language: generic
+      env: PYTHON=3.7.1
+      before_install:
+        - brew update
+          # Per the `pyenv homebrew recommendations <https://github.com/yyuu/pyenv/wiki#suggested-build-environment>`_.
+        - brew install openssl readline
+          # See https://docs.travis-ci.com/user/osx-ci-environment/#A-note-on-upgrading-packages.
+          # I didn't do this above because it works and I'm lazy.
+        - brew outdated pyenv || brew upgrade pyenv
+          # virtualenv doesn't work without pyenv knowledge. venv in Python 3.3
+          # doesn't provide Pip by default. So, use `pyenv-virtualenv <https://github.com/yyuu/pyenv-virtualenv/blob/master/README.md>`_.
+        - brew install pyenv-virtualenv
+        - pyenv install $PYTHON
+          # I would expect something like ``pyenv init; pyenv local $PYTHON`` or
+          # ``pyenv shell $PYTHON`` would work, but ``pyenv init`` doesn't seem to
+          # modify the Bash environment. ??? So, I hand-set the variables instead.
+        - export PYENV_VERSION=$PYTHON
+        - export PATH="/Users/travis/.pyenv/shims:${PATH}"
+        - pyenv virtualenv venv
+        - source venv/bin/activate
+          # A manual check that the correct version of Python is running.
+        - python --version
+        - python get-pip.py
+        - pip install --upgrade setuptools wheel
+        - pip install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-16.04 wxPython
+        - pip install --upgrade -r requirements.txt
+      before_deploy:
+        # Set up git user name and tag this commit
+        - git config --local user.name "mysteriousham73"
+        - git config --local user.email "mysteriousham73@gmail.com"
+        - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+        - git tag $TRAVIS_TAG
+      deploy:
+        skip_cleanup: true
+        file_glob: true
+        provider: releases
+        api_key:
+          secure: nfqZsJoc1SZfooO9657cDezp42aGUfwydrfpwZaJefra1aW4eCcFGS8nfOlvJl8GZOtzlIrmGLuGZGyiTOwozzFgz3PWAOn8/KqgOvNUDsWOFXKgV/K59bfPiabOikHd9gTpJ0pizdFfLzTpf+lwVbBF27z3gnBkUSyZgAxrdu4nu9gip+fgBZOSPJKvfhZTCuyeNGL4kXWujRMFfTS2E9puQ+my2H+SugTrLRiNFiUbpEn8NnmIONbudaKHbgHiAPOI06PDISE0gTDzfoSI3fr13CzAGj2u3F9Bj/4yAcgkuu7Zc96jjpAqxvRxO3pZgdgV07fQ88+0Dbcxz/iGukPlxP1JiwF+BYmEBGX9/TNPEs2eRNHGzrK+GxFwl5RKM/1kfrUy8FDynWThYfYYJfJt5chkC63sxtVzxE+fOMpRGr4FQu4ow2rSvMTnY3zU5KZxcx4PilG/AI/TI0EuTape/jUVZTadXNWNQf8rfzxrwX1urGQ6kvoRxucT8stQtkQgBFcJu+GT30++C2/IkWOuF3l7giriQcog+YsJ78DOAeY/Cser4BxKV8B4XidpGJgDtr/8hKw3gkr7zhWlPqZBhzmK/sOuAQu1irfE08e8RQuvzxiOgOzSaj018gcootoPt242/zuoUExBDFu/TDGR++tk2ioCTFTJ14mfGvY=
+        file: dist/*
+        overwrite: true
+
+        on:
+          repo: mysteriousham73/flexdoppler
+          branch: master
+
+    - os: windows
+      language: sh
+      before_install:
+        - git clone https://github.com/pyenv-win/pyenv-win.git $HOME/.pyenv
+        - export PATH="$HOME/.pyenv/pyenv-win/bin:$HOME/.pyenv/pyenv-win/shims:$PATH"
+        - pyenv install -q 3.7.1
+        - pyenv rehash
+        - pyenv local 3.7.1
+        - python --version
+        - python -m pip install -U pip
+        - pip install --upgrade setuptools wheel
+        - pip install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-16.04 wxPython
+        - pip install --upgrade -r requirements.txt
+        - export PATH="$HOME/.pyenv/pyenv-win/versions/3.7.1/Scripts:$PATH"
+      before_deploy:
+        # Set up git user name and tag this commit
+        - git config --local user.name "mysteriousham73"
+        - git config --local user.email "mysteriousham73@gmail.com"
+        - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+        - git tag $TRAVIS_TAG
+      deploy:
+        skip_cleanup: true
+        file_glob: true
+        provider: releases
+        api_key:
+          secure: nfqZsJoc1SZfooO9657cDezp42aGUfwydrfpwZaJefra1aW4eCcFGS8nfOlvJl8GZOtzlIrmGLuGZGyiTOwozzFgz3PWAOn8/KqgOvNUDsWOFXKgV/K59bfPiabOikHd9gTpJ0pizdFfLzTpf+lwVbBF27z3gnBkUSyZgAxrdu4nu9gip+fgBZOSPJKvfhZTCuyeNGL4kXWujRMFfTS2E9puQ+my2H+SugTrLRiNFiUbpEn8NnmIONbudaKHbgHiAPOI06PDISE0gTDzfoSI3fr13CzAGj2u3F9Bj/4yAcgkuu7Zc96jjpAqxvRxO3pZgdgV07fQ88+0Dbcxz/iGukPlxP1JiwF+BYmEBGX9/TNPEs2eRNHGzrK+GxFwl5RKM/1kfrUy8FDynWThYfYYJfJt5chkC63sxtVzxE+fOMpRGr4FQu4ow2rSvMTnY3zU5KZxcx4PilG/AI/TI0EuTape/jUVZTadXNWNQf8rfzxrwX1urGQ6kvoRxucT8stQtkQgBFcJu+GT30++C2/IkWOuF3l7giriQcog+YsJ78DOAeY/Cser4BxKV8B4XidpGJgDtr/8hKw3gkr7zhWlPqZBhzmK/sOuAQu1irfE08e8RQuvzxiOgOzSaj018gcootoPt242/zuoUExBDFu/TDGR++tk2ioCTFTJ14mfGvY=
+        file: dist/*
+        overwrite: true
+
+        on:
+          repo: mysteriousham73/flexdoppler
+          branch: master
+
+    - os: linux
+      python: 3.7
+      before_install:
+        - python get-pip.py
+        - pip install --upgrade setuptools wheel
+        - pip install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-16.04 wxPython
+        - pip install --upgrade -r requirements.txt
+      before_deploy:
+        # Set up git user name and tag this commit
+        - git config --local user.name "mysteriousham73"
+        - git config --local user.email "mysteriousham73@gmail.com"
+        - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+        - git tag $TRAVIS_TAG
+      deploy:
+        skip_cleanup: true
+        file_glob: true
+        provider: releases
+        api_key:
+          secure: nfqZsJoc1SZfooO9657cDezp42aGUfwydrfpwZaJefra1aW4eCcFGS8nfOlvJl8GZOtzlIrmGLuGZGyiTOwozzFgz3PWAOn8/KqgOvNUDsWOFXKgV/K59bfPiabOikHd9gTpJ0pizdFfLzTpf+lwVbBF27z3gnBkUSyZgAxrdu4nu9gip+fgBZOSPJKvfhZTCuyeNGL4kXWujRMFfTS2E9puQ+my2H+SugTrLRiNFiUbpEn8NnmIONbudaKHbgHiAPOI06PDISE0gTDzfoSI3fr13CzAGj2u3F9Bj/4yAcgkuu7Zc96jjpAqxvRxO3pZgdgV07fQ88+0Dbcxz/iGukPlxP1JiwF+BYmEBGX9/TNPEs2eRNHGzrK+GxFwl5RKM/1kfrUy8FDynWThYfYYJfJt5chkC63sxtVzxE+fOMpRGr4FQu4ow2rSvMTnY3zU5KZxcx4PilG/AI/TI0EuTape/jUVZTadXNWNQf8rfzxrwX1urGQ6kvoRxucT8stQtkQgBFcJu+GT30++C2/IkWOuF3l7giriQcog+YsJ78DOAeY/Cser4BxKV8B4XidpGJgDtr/8hKw3gkr7zhWlPqZBhzmK/sOuAQu1irfE08e8RQuvzxiOgOzSaj018gcootoPt242/zuoUExBDFu/TDGR++tk2ioCTFTJ14mfGvY=
+        file: dist/*
+
+        on:
+          repo: mysteriousham73/flexdoppler
+          branch: master
+
+
+
+script:
+  - PYTHONPATH=c:\users\travis\.pyenv\pyenv-win\versions\3.7.1\Scripts pyinstaller --onefile source/keplermatik.py
+
+#after_success:
+#  - coveralls
+
+
+deploy:
+  skip_cleanup: true
+  file_glob: true
+  provider: releases
+  api_key:
+    secure: nfqZsJoc1SZfooO9657cDezp42aGUfwydrfpwZaJefra1aW4eCcFGS8nfOlvJl8GZOtzlIrmGLuGZGyiTOwozzFgz3PWAOn8/KqgOvNUDsWOFXKgV/K59bfPiabOikHd9gTpJ0pizdFfLzTpf+lwVbBF27z3gnBkUSyZgAxrdu4nu9gip+fgBZOSPJKvfhZTCuyeNGL4kXWujRMFfTS2E9puQ+my2H+SugTrLRiNFiUbpEn8NnmIONbudaKHbgHiAPOI06PDISE0gTDzfoSI3fr13CzAGj2u3F9Bj/4yAcgkuu7Zc96jjpAqxvRxO3pZgdgV07fQ88+0Dbcxz/iGukPlxP1JiwF+BYmEBGX9/TNPEs2eRNHGzrK+GxFwl5RKM/1kfrUy8FDynWThYfYYJfJt5chkC63sxtVzxE+fOMpRGr4FQu4ow2rSvMTnY3zU5KZxcx4PilG/AI/TI0EuTape/jUVZTadXNWNQf8rfzxrwX1urGQ6kvoRxucT8stQtkQgBFcJu+GT30++C2/IkWOuF3l7giriQcog+YsJ78DOAeY/Cser4BxKV8B4XidpGJgDtr/8hKw3gkr7zhWlPqZBhzmK/sOuAQu1irfE08e8RQuvzxiOgOzSaj018gcootoPt242/zuoUExBDFu/TDGR++tk2ioCTFTJ14mfGvY=
+  file: dist/*
+
+  on:
+    repo: mysteriousham73/flexdoppler
+    branch: master
+
+
