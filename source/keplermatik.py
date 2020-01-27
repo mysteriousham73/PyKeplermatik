@@ -3,7 +3,6 @@ import multiprocessing as mp
 import keplermatik_radios, flexradio_network, keplermatik_satellites, satnogs_network, pickle
 from time import gmtime, time, sleep
 import os
-import pickle
 #import timeit
 #os.environ["KIVY_NO_CONSOLELOG"] = "1"
 
@@ -24,40 +23,12 @@ def init():
     print("")
 
     radios = keplermatik_radios.Radios()
-    #satellites = keplermatik_satellites.Satellites()
-    #satnogs = satnogs_network.SatnogsClient(satellites)
-    #satnogs.get_satellites()
-    #satellites.cleanup_untrackable_satellites()
-    #filename = 'satellite_data'
-    #outfile = open(filename, 'wb')
-    #pickle.dump(satellites, outfile)
-    #outfile.close()
-    infile = open('satellite_data', 'rb')
-    satellites = pickle.load(infile)
-    infile.close()
-    print("LOADING TLEs | " + str(len(satellites)) + " SATELLITES")
-    infile = open('satellites_with_tles', 'rb')
-    satellites = pickle.load(infile)
-    infile.close()
-
-#    for norad_cat_id, satellite in satellites.items():
-    #    print("LOADING TLE | " + satellite.name)
-#        satellite.load_tle()
-    print("TLES LOADED")
-    #outfile = open('satellites_with_tles', 'wb')
-    #pickle.dump(satellites, outfile)
-    #outfile.close()
-    infile = open('satellites_with_tles', 'rb')
-    satellites = pickle.load(infile)
-    infile.close()
-
+    satellites = keplermatik_satellites.Satellites()
 
     print("PREDICTING SATELLITES | " + str(len(satellites)) + " SATELLITES")
     start_time = time()
-    timing = predict_satellites_mp(satellites)
-    print("PREDICTIONS COMPLETE | " + str(len(satellites)) + " SATELLITES IN " + str(round(time() - start_time, 3)) + " SECONDS")
-    print("PREDICTION RUN | QUEUE LOAD " + str(timing['queue_load']) + " PREDICT " + str(timing['prediction']) + " (" + str(round(timing['prediction'] / len(satellites), 3)) + "/SAT) " + "QUEUE UNLOAD " + str(timing['queue_unload']))
-    print(satellites[7530])
+    satellites.predict_all()
+    print(satellites[38760])
 
 class Predictor(mp.Process):
 

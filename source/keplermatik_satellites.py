@@ -1,9 +1,33 @@
 from keplermatik_transmitters import Transmitter, Transmitters
+from keplermatik_predictor import Predictor
+import satnogs_network
+from multiprocessing import Process
 from skyfield.api import Topos, EarthSatellite, load
+from time import time
 import re, numpy as np
 
 
 class Satellites(dict):
+
+    def __init__(self):
+        super(Satellites, self).__init__()
+        self.predictor = Predictor(self)
+
+        satnogs = satnogs_network.SatnogsClient(self)
+        satnogs.get_satellites()
+        print("LOADING TLEs | " + str(len(self)) + " SATELLITES")
+        for norad_cat_id, satellite in self.items():
+            # print("LOADING TLE | " + satellite.name)
+            satellite.load_tle()
+        print("TLES LOADED")
+
+    def predict_all(self):
+        start_time = time()
+
+        timing = self.predictor.predict()
+
+        print("PREDICTIONS COMPLETE | " + str(len(self)) + " SATELLITES IN " + str(round(time() - start_time, 3)) + " SECONDS")
+        print("PREDICTION RUN | QUEUE LOAD " + str(timing['queue_load']) + " PREDICT " + str(timing['prediction']) + " (" + str(round(timing['prediction'] / len(self), 3)) + "/SAT) " + "QUEUE UNLOAD " + str(timing['queue_unload']))
 
     @property
     def selected_satellite(self):
@@ -19,8 +43,7 @@ class Satellites(dict):
                 satellites_to_delete.append(id)
 
         for satellite_to_delete in satellites_to_delete:
-            for satellite in [satellite for satellite in self if satellite == satellite_to_delete]: del \
-            self[int(satellite_to_delete)]
+            for satellite in [satellite for satellite in self if satellite == satellite_to_delete]: del(self[int(satellite_to_delete)])
 
         print("CLEANED UP " + str(len(satellites_to_delete)) + " SATELLITES | " + str(len(self)) + " SATELLITES TRACKABLE")
 
@@ -55,10 +78,15 @@ class Satellite(object):
         for name, value in data.items():
             setattr(self, name, self._wrap(value))
 
-        self.tle = TLE(self.norad_cat_id, "tle.txt")
+        self.tle = TLE(self.norad_cat_id)
 
     def load_tle(self):
-        self.tle.load_tle()
+        self.tle.load_tle("tle.txt")
+
+    def tle_exists(self, filename):
+        self.tle.load_tle(filename)
+        return self.tle.exists
+
 
     def _wrap(self, value):
         if isinstance(value, (tuple, list, set, frozenset)):
@@ -83,6 +111,9 @@ class Satellite(object):
         hours = np.arange(17, 18, 0.25)
         tscale = ts.utc(this_gmtime[0], this_gmtime[1], this_gmtime[2], this_gmtime[3], this_gmtime[4], this_gmtime[5])
         return self.predict(tscale)
+
+    def predict_range(self, start_time, finish_time, step):
+        pass
 
     def predict(self, tscale):
         sat = EarthSatellite(self.tle.tle_lines[1], self.tle.tle_lines[2], self.name)
@@ -116,15 +147,17 @@ class Satellite(object):
 
 
 class TLE:
-    def __init__(self, norad_cat_id, filename):
+
+    def __init__(self, norad_cat_id):
         self.exists = False
         self.tle_text = ""
         self.tle_lines = []
         self.norad_cat_id = norad_cat_id
-        self.filename = filename
+        self.filename = ""
 
-    def load_tle(self):
-        with open(self.filename, 'r') as file:
+
+    def load_tle(self, filename):
+        with open(filename, 'r') as file:
             tle_file_contents = file.read()
             re_string = "\n(.*\n1.*" + str(self.norad_cat_id) + "[UCS].*\n.*)"
             self.tle_text = re.findall(re_string, tle_file_contents)
