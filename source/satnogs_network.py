@@ -1,6 +1,6 @@
 import requests, re, os, pickle
 from requests_toolbelt.threaded import pool
-from skyfield.api import load
+
 import keplermatik_satellites
 import keplermatik_transmitters
 
@@ -14,17 +14,18 @@ class SatnogsClient:
         satellites_url = 'https://db.satnogs.org/api/satellites/'
         print("GETTING SATELLITES | " + satellites_url)
         payload = {'status': 'alive'}
+
         try:
             r = requests.get(satellites_url, params=payload)
             outfile = open('satnogs_satellites', 'wb')
             pickle.dump(r, outfile)
             outfile.close()
+
         except:
             print("NETWORK ERROR | USING CACHED SATNOGS SATELLITES")
             infile = open('satnogs_satellites', 'rb')
             r = pickle.load(infile)
             infile.close()
-
 
         for satellite in r.json():
 
@@ -32,8 +33,6 @@ class SatnogsClient:
             satellite['selected'] = False
             if(satellite['norad_cat_id'] != 99999):
                 self.satellites.update({satellite['norad_cat_id']:keplermatik_satellites.Satellite(satellite)})
-
-#todo: handle network errors
 
         transmitters_url = 'https://db.satnogs.org/api/transmitters/'
         print("GETTING TRANSMITTERS | " + transmitters_url)
@@ -45,6 +44,7 @@ class SatnogsClient:
             outfile = open('satnogs_transmitters', 'wb')
             pickle.dump(t, outfile)
             outfile.close()
+
         except:
             print("NETWORK ERROR | USING CACHED SATNOGS TRANSMITTERS")
             infile = open('satnogs_transmitters', 'rb')
@@ -62,33 +62,29 @@ class SatnogsClient:
         del self.transmitters
 
         #todo: select first satellite
-
         self.update_tles()
-
-        #self.satellites.cleanup_untrackable_satellites()
 
 
     def update_tles(self):
-    #todo: so much to organize, maybe create different functions
-        tle_text = ""
-        tle_not_found_count = 0
-        manual_tle_count = 0
-        celestrack_urls = []
-        manual_tle_urls = []
-
-        #if os.path.exists("tle.txt"):
-        #    os.remove("tle.txt")
 
         print("UPDATING TLEs | " + str(len(self.satellites)) + " SATELLITES IN SATNOGS")
 
-        celestrack_files = ['satnogs.txt', 'active.txt', 'tle-new.txt']
+        celestrak_files = ['satnogs.txt', 'active.txt', 'tle-new.txt']
+        self._get_celestrak_tles(celestrak_files)
+        self._get_satnogs_tles()
+        self._write_tle_files()
+
+
+    def _get_celestrak_tles(self, celestrack_files):
+        tle_text = ""
+        celestrak_urls = []
 
         print("DOWNLOADING CELESTRAK TLEs | " + ', '.join(celestrack_files).upper())
 
         for filename in celestrack_files:
-            celestrack_urls.append('https://celestrak.com/NORAD/elements/' + filename)
+            celestrak_urls.append('https://celestrak.com/NORAD/elements/' + filename)
 
-        p = pool.Pool.from_urls(celestrack_urls)
+        p = pool.Pool.from_urls(celestrak_urls)
         p.join_all()
 
         for response in p.responses():
@@ -97,22 +93,26 @@ class SatnogsClient:
 
         if(len(tle_text) != 0):
 
-            with open('celestrack_tle.txt', 'wb') as file:
+            with open('celestrak_tle.txt', 'wb') as file:
                 file.write(bytes(tle_text, "UTF-8"))
 
             print("CELESTRACK TLEs LOADED")
 
         else:
             print("NETWORK ERROR | USING CACHED CELESTRACK TLES")
-            with open('celestrack_tle.txt', 'r') as file:
+            with open('celestrak_tle.txt', 'r') as file:
                 tle_text = file.read()
 
-        #print("TLES: " + tle_text)
         del (p)
 
-        for id, satellite in self.satellites.items():
 
-            if not satellite.tle_exists("celestrack_tle.txt"):
+    def _get_satnogs_tles(self):
+        tle_not_found_count = 0
+        manual_tle_count = 0
+        manual_tle_urls = []
+
+        for id, satellite in self.satellites.items():
+            if not satellite.tle_exists("celestrak_tle.txt"):
                 tle_not_found_count += 1
                 manual_tle_urls.append('https://db.satnogs.org/satellite/' + str(satellite.norad_cat_id) + "/")
 
@@ -132,11 +132,6 @@ class SatnogsClient:
                 manual_tle_count += 1
                 manual_tles += tle_name + "\r\n" + tle_line1 + "\r\n" + tle_line2 + "\r\n"
 
-        for exc in p.exceptions():
-            pass
-            #print('GET {}. Raised {}.'.format(exc.request_kwargs['url'],
-            #                                 exc.message))
-
         if (len(manual_tles) != 0):
             with open('satnogs_tle.txt', 'wb') as file:
                 file.write(bytes("\n", "UTF-8"))
@@ -152,14 +147,19 @@ class SatnogsClient:
 
             print('NETWORK ERROR | ' + str(manual_tle_count) + " MANUAL TLEs ADDED FROM SATNOGS TLE CACHE")
 
-        with open('tle.txt', 'wb') as file:
-            file.write(bytes(tle_text, "UTF-8"))
-            #todo fix \n between the files
-            with open('satnogs_tle.txt', 'r') as file2:
-                manual_tles = file2.read()
-                file.write(bytes(manual_tles, "UTF-8"))
 
-        print('REMOVING UNTRACKABLE SATELLITES | ' + str(tle_not_found_count - manual_tle_count) + " SATELLITES NOT TRACKABLE")
+    def _write_tle_files(self):
+        tle_text = ""
+        with open('celestrak_tle.txt', 'r') as celestrak_file:
+            tle_text = celestrak_file.read()
+            with open('tle.txt', 'wb') as tle_file:
+                tle_file.write(bytes(tle_text, "UTF-8"))
+                #todo fix \n between the files
+                with open('satnogs_tle.txt', 'r') as satnogs_file:
+                    manual_tles = satnogs_file.read()
+                    tle_file.write(bytes(manual_tles, "UTF-8"))
+
+        #print('REMOVING UNTRACKABLE SATELLITES | ' + str(tle_not_found_count - manual_tle_count) + " SATELLITES NOT TRACKABLE")
 
         self.satellites.cleanup_untrackable_satellites()
 

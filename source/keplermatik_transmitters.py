@@ -15,7 +15,6 @@ class Transmitters(dict):
 
         print("TRANSMITTER SELECTED | " + selected_transmitter_text)
 
-
     def select_transmitter(self, transmitter):
         for uuid, alltransmitters in self.items():
             alltransmitters.selected = False

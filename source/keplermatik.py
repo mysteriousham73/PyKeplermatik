@@ -1,12 +1,10 @@
 import sys
 import multiprocessing as mp
-import keplermatik_radios, flexradio_network, keplermatik_satellites, satnogs_network, pickle
+import keplermatik_radios, flexradio_network, keplermatik_satellites
 from time import gmtime, time, sleep
-import os
+
 #import timeit
 #os.environ["KIVY_NO_CONSOLELOG"] = "1"
-
-
 
 # fix for pyinstaller packages app to avoid ReactorAlreadyInstalledError
 if 'twisted.internet.reactor' in sys.modules:
@@ -28,7 +26,7 @@ def init():
     print("PREDICTING SATELLITES | " + str(len(satellites)) + " SATELLITES")
     start_time = time()
     satellites.predict_all()
-    print(satellites[38760])
+    #print(satellites[7530])
 
 class Predictor(mp.Process):
 

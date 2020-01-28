@@ -1,5 +1,15 @@
 import multiprocessing as mp
 from time import gmtime, time, sleep
+import psutil
+
+class PredictEngine():
+    def __init__(self):
+        self.predictor = Predictor()
+        self.first_pass_resolution = 60
+        self.final_resolution = 0.3
+
+
+
 
 #todo: thread this for progress bar
 class Predictor():
@@ -7,38 +17,45 @@ class Predictor():
         self.satellites = satellites
         self.queue_complete = 0
         self.initial_queue_depth = 0
+        self.in_queue = mp.Queue()
+        self.out_queue = mp.Queue()
+        self.cpus = psutil.cpu_count(logical=False)
+        #self.cpus = 6
+        #self.worker_count = self.cpus - 1
+        self.worker_count = 4
 
-    def predict(self):
-        in_queue = mp.Queue()
-        out_queue = mp.Queue()
+        print("SPAWNING WORKERS | " + str(self.worker_count) + " PREDICTION WORKERS ON " + str(self.cpus) + " AVAILABLE CORES")
 
-        workers = [PredictorWorker(str(worker_name), in_queue, out_queue) for worker_name in range(4)]
-        timing = {}
+        self.workers = [PredictorWorker(str(worker_name), self.in_queue, self.out_queue) for worker_name in range(self.worker_count)]
 
-        for worker in workers:
+        for worker in self.workers:
             worker.daemon = True
             worker.start()
 
+    def predict(self):
 
+        timing = {}
         start_time = time()
 
         for norad_cat_id, satellite in self.satellites.items():
-            in_queue.put(satellite)
+            self.in_queue.put(satellite)
             self.initial_queue_depth += 1
 
         timing['queue_load'] = round(time() - start_time, 3)
         start_time = time()
         #in_queue.join()
 
-
-        while out_queue.qsize() != self.initial_queue_depth:
-            self.queue_complete = out_queue.qsize()
-            sleep(0.05)
+        while self.out_queue.qsize() != self.initial_queue_depth:
+            self.queue_complete = self.out_queue.qsize()
+            #print(psutil.cpu_percent())
+            print(self.progress)
+            sleep(1)
 
         timing['prediction'] = round(time() - start_time, 3)
         start_time = time()
-        while not out_queue.empty():
-            satellite = out_queue.get()
+
+        while not self.out_queue.empty():
+            satellite = self.out_queue.get()
             self.satellites[satellite.norad_cat_id] = satellite
 
         timing['queue_unload'] = round(time() - start_time, 3)
@@ -65,6 +82,7 @@ class PredictorWorker(mp.Process):
             try:
                 satellite.predict_gmtime(gmtime())
                 self.out_queue.put(satellite)
+
             finally:
                 pass
                 #self.in_queue.task_done()

@@ -1,7 +1,6 @@
-from keplermatik_transmitters import Transmitter, Transmitters
+from keplermatik_transmitters import Transmitters
 from keplermatik_predictor import Predictor
 import satnogs_network
-from multiprocessing import Process
 from skyfield.api import Topos, EarthSatellite, load
 from time import time
 import re, numpy as np
@@ -74,7 +73,7 @@ class Satellite(object):
         self.range_rate = 0
         self.transmitters = Transmitters()
         self.norad_cat_id = 0
-
+        self.current_time_resolution = 1
         for name, value in data.items():
             setattr(self, name, self._wrap(value))
 
@@ -108,8 +107,10 @@ class Satellite(object):
     def predict_gmtime(self, this_gmtime):
         ts = load.timescale()
         #utc(self, year, month=1, day=1, hour=0, minute=0, second=0.0):
-        hours = np.arange(17, 18, 0.25)
-        tscale = ts.utc(this_gmtime[0], this_gmtime[1], this_gmtime[2], this_gmtime[3], this_gmtime[4], this_gmtime[5])
+        hours = np.arange(0, 23, 1/60)
+        #minutes = np.arange(0, 2, (1))
+        #tscale = ts.utc(this_gmtime[0], this_gmtime[1], this_gmtime[2], this_gmtime[3], this_gmtime[4], this_gmtime[5])
+        tscale = ts.utc(2019, 1, 27, hours)
         return self.predict(tscale)
 
     def predict_range(self, start_time, finish_time, step):
