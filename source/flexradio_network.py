@@ -9,7 +9,6 @@ class RadioDiscovery(DatagramProtocol):
     def __init__(self, radios):
         self.radios = radios
 
-
     def datagramReceived(self, datagram, address):
         if (str(datagram).find("discovery_protocol_version") != -1):
             self.process_message(str(datagram))
@@ -18,16 +17,12 @@ class RadioDiscovery(DatagramProtocol):
 
         radio_config_list = re.findall(r'(\S*)=(\S*)', str(message))
         radio_config_list.pop(0)
-        # print(radio_config_list)
         radio_config = dict(radio_config_list)
         radio_config['selected'] = False
         radio_config['last_seen'] = time()
 
         #todo:  this is part of conversion to radio object from dict
         new_radio = Radio(radio_config)
-        #print(new_radio.serial)
-        #new_radio.serial = "test"
-        #print(new_radio.serial)
 
         seen_radio = [element for element in self.radios if element['serial'] == radio_config['serial']]
 
@@ -53,16 +48,12 @@ class RadioDiscovery(DatagramProtocol):
             seen_radio[0]['last_seen'] = radio_config['last_seen']
 
 
-
-
 class FlexClient(protocol.Protocol):
-    """Once connected, send a message, then print the result."""
 
     def connectionMade(self):
         self.transport.write(self.factory.message)
 
     def dataReceived(self, data):
-        "As soon as any data is received, write it back."
         print("Server said:", data)
         self.transport.loseConnection()
 

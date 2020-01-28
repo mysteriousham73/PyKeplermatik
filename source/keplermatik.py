@@ -1,4 +1,3 @@
-import sys
 import multiprocessing as mp
 import keplermatik_radios, flexradio_network, keplermatik_satellites
 

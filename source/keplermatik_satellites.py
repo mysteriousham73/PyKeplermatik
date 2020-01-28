@@ -86,7 +86,6 @@ class Satellite(object):
         self.tle.load_tle(filename)
         return self.tle.exists
 
-
     def _wrap(self, value):
         if isinstance(value, (tuple, list, set, frozenset)):
             return type(value)([self._wrap(v) for v in value])
@@ -101,7 +100,6 @@ class Satellite(object):
     def predict_now(self):
         ts = load.timescale()
         timescale = ts.now()
-        # print(sat.epoch.tt)
         self.predict(timescale)
 
     def predict_gmtime(self, this_gmtime):
